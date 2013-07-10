@@ -53,45 +53,65 @@
         onPoke : blankFunc, 
         onSwipe : blankFunc, 
         onGrab : blankFunc,
-        onWiggle : blankFunc 
+        onWiggle : blankFunc
     }
     
     //define our functions
     var methods = {
-        initLeap : function() {
+        initLeap : function(options) {
           console.log("Loaded plugin.");
           
-          // Support both the WebSocket and MozWebSocket objects
-          if ((typeof(WebSocket) == 'undefined') && (typeof(MozWebSocket) != 'undefined')) {
-             WebSocket = MozWebSocket;
-          }
-          
-          //Create and open the socket
-          ws = new WebSocket("ws://localhost:6437/");
-          
-          // On successful connection
-          ws.onopen = function(event) {
-            console.log("Connected to Leap device."); 
-            events.onConnect();  
-          };
-          
-          // On message received
-          ws.onmessage = function(event) {
-            window.leapData = $.parseJSON(event.data);
-            $.fn.leap("leapFrame");
-          };
-          
-          // On socket close
-          ws.onclose = function(event) {
-            ws = null;
-            events.onDisconnect();  
-            console.log("Disconnected from Leap device.");  
-          }
-          
-          //On socket error
-          ws.onerror = function(event) {
-            console.log("Error connecting to Leap device.");
-          };
+		  if(typeof window.Leap !== "undefined") { 
+			  // Support both the WebSocket and MozWebSocket objects
+			  if ((typeof(WebSocket) == 'undefined') && (typeof(MozWebSocket) != 'undefined')) {
+				 WebSocket = MozWebSocket;
+			  }
+			  
+			  //Create and open the socket
+			  ws = new WebSocket("ws://localhost:6437/");
+			  
+			  // On successful connection
+			  ws.onopen = function(event) {
+				console.log("Connected to Leap device."); 
+				events.onConnect();  
+			  };
+			  
+			  // On message received
+			  ws.onmessage = function(event) {
+				window.leapData = $.parseJSON(event.data);
+				$.fn.leap("leapFrame");
+			  };
+			  
+			  // On socket close
+			  ws.onclose = function(event) {
+				ws = null;
+				events.onDisconnect();  
+				console.log("Disconnected from Leap device.");  
+			  }
+			  
+			  //On socket error
+			  ws.onerror = function(event) {
+				console.log("Error connecting to Leap device.");
+			  };
+		  } else {
+			events.onConnect();
+		  
+			// Store frame for motion functions
+			//var previousFrame;
+			//var paused = false;
+			//var pauseOnGesture = false;
+
+			// Setup Leap loop with frame callback function
+			var controllerOptions = {enableGestures: false};
+
+			window.Leap.loop(controllerOptions, function(frame) {
+			  window.leapData = frame;
+			  $.fn.leap("leapFrame");
+			  
+			  // Store frame for motion functions
+			  //previousFrame = frame;
+			});
+		  }
         },
         leapFrame : function() {
             //keep track of the frames and time
@@ -164,16 +184,19 @@
                            pushing[key].frameStarted = frameCount;
                            pushing[key].isPushing = true;
                     }
+					
+                    if(typeof pushing[key] != "undefined") {
+						if(pushing[key].isPushing && (frameCount - pushing[key].frameStarted) > pushingTimer) pushing[key].isPushing = false;
+					
                     
-                    if(pushing[key].isPushing && (frameCount - pushing[key].frameStarted) > pushingTimer) pushing[key].isPushing = false;
-                    
-                    if(pushing[key].isPushing != false) {  
-                        if(palmForward > -10) {
-                           pushing[key].isPushing = false; 
-                           events.onPush(hand);
-                        }
-                    }
-                    pushing[key].lastPalm = palmZ; 
+						if(pushing[key].isPushing != false) {  
+							if(palmForward > -10) {
+							   pushing[key].isPushing = false; 
+							   events.onPush(hand);
+							}
+						}
+						pushing[key].lastPalm = palmZ; 
+					}
                 });
             }
             
@@ -195,23 +218,29 @@
             
             if(window.leapData.numHands > 0 && events.onGrab != blankFunc) {  
                  $.each(window.leapData.hands, function(key, hand) { 
-                     if(window.leapData.numPointables == 0) grabbing[key].palmOpen = false; 
-                     if(window.leapData.numPointables > 1) grabbing[key].grabbing = false; 
-                     if(window.leapData.numPointables > 2) grabbing[key].palmOpen = true;
+					if(typeof grabbing[key] != "undefined") {
+						 if(window.leapData.numPointables == 0) grabbing[key].palmOpen = false; 
+						 if(window.leapData.numPointables > 1) grabbing[key].grabbing = false; 
+						 if(window.leapData.numPointables > 2) grabbing[key].palmOpen = true;
 
-                     var grabbed = false;
-                     for(var i=0;i<grabbingTimer;i++) {
-                         if(grabbing.history[i]) grabbed = true; 
-                     }
-                     
-                     if(!grabbing[key].palmOpen && (grabbed || grabbing[key].grabbing) && (Math.abs(hand.palmPosition[0]) < xEdge && hand.palmPosition[2] < zEdge && hand.palmPosition[1] < yEdge)) {
-                         grabbing[key].grabbing = true; 
-                         events.onGrab(hand);
-                     }
-                     
-                     grabbing.history[grabbing.frames] = grabbing[key].palmOpen;
-                     grabbing.frames++;
-                     if(grabbing.frames == grabbingTimer) grabbing.frames = 0;
+						 var grabbed = false;
+						 for(var i=0;i<grabbingTimer;i++) {
+							if(typeof grabbing.history != "undefined") { 
+								if(grabbing.history[i]) grabbed = true; 
+							}
+						 }
+						 
+						
+						 if(!grabbing[key].palmOpen && (grabbed || grabbing[key].grabbing) && (Math.abs(hand.palmPosition[0]) < xEdge && hand.palmPosition[2] < zEdge && hand.palmPosition[1] < yEdge)) {
+							 grabbing[key].grabbing = true; 
+							 events.onGrab(hand);
+						 }
+						 
+						 
+						 grabbing.history[grabbing.frames] = grabbing[key].palmOpen;
+						 grabbing.frames++;
+						 if(grabbing.frames == grabbingTimer) grabbing.frames = 0;
+					 }
                  });
             }
             
@@ -281,10 +310,18 @@
         setEvent : function(name, event) {
             events[name] = event;
         },
-        setEvents : function(e) {
+        setEvents : function(e, options) {
             $.each(e, function(key, func) {
                 events[key] = func;    
             });
+			if(typeof options.Leap !== "undefined") {
+				window.Leap = options.Leap;
+				if(typeof options.controllerOptions === "undefined") {
+					window.controllerOptions = {enableGestures: false};
+				} else {
+					window.controllerOptions = options.controllerOptions;
+				}
+			}
         },
         data : function() {
             return window.leapData;
@@ -294,7 +331,6 @@
         }
     }
     
- 
     $.fn.leap = function(method) {
         if(!isInit) {
             isInit = true;
