@@ -53,15 +53,15 @@
         onPoke : blankFunc, 
         onSwipe : blankFunc, 
         onGrab : blankFunc,
-        onWiggle : blankFunc
+        onWiggle : blankFunc 
     }
     
     //define our functions
     var methods = {
-        initLeap : function(options) {
-          console.log("Loaded plugin.");
-          
-		  if(typeof window.Leap !== "undefined") { 
+        initLeap : function() {
+          console.log("Loaded plugin!!");
+ 
+		  if(typeof(window.Leap) == "undefined") { 
 			  // Support both the WebSocket and MozWebSocket objects
 			  if ((typeof(WebSocket) == 'undefined') && (typeof(MozWebSocket) != 'undefined')) {
 				 WebSocket = MozWebSocket;
@@ -103,7 +103,7 @@
 
 			// Setup Leap loop with frame callback function
 			var controllerOptions = {enableGestures: false};
-
+			
 			window.Leap.loop(controllerOptions, function(frame) {
 			  window.leapData = frame;
 			  $.fn.leap("leapFrame");
@@ -314,12 +314,15 @@
             $.each(e, function(key, func) {
                 events[key] = func;    
             });
-			if(typeof options.Leap !== "undefined") {
-				window.Leap = options.Leap;
-				if(typeof options.controllerOptions === "undefined") {
-					window.controllerOptions = {enableGestures: false};
-				} else {
-					window.controllerOptions = options.controllerOptions;
+			if(typeof options != "undefined") {
+				if(typeof options.Leap != "undefined") {
+					window.Leap = options.Leap;
+					console.log("options leap is set");
+					if(typeof options.controllerOptions === "undefined") {
+						window.controllerOptions = {enableGestures: false};
+					} else {
+						window.controllerOptions = options.controllerOptions;
+					}
 				}
 			}
         },
